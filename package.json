@@ -1,0 +1,52 @@
+{
+  "name": "pino-google-logging",
+  "version": "0.1.0",
+  "description": "Pino transport for Google Logging",
+  "main": "dist/src/index.js",
+  "scripts": {
+    "clean": "tsc -b tsconfig.build.json --clean",
+    "compile": "tsc -b tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "format:check": "npm run prettier -- --check",
+    "format": "npm run prettier -- --write",
+    "lint:fix": "eslint . --fix",
+    "lint": "npm run format:check",
+    "postclean": "rimraf dist",
+    "prettier": "prettier . --ignore-path ../../.prettierignore",
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/trantamjp/pino-google-logging.git"
+  },
+  "keywords": [
+    "pino",
+    "google-logging",
+    "transport"
+  ],
+  "author": "Tam Tran",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/trantamjp/pino-google-logging/issues"
+  },
+  "homepage": "https://github.com/trantamjp/pino-google-logging#readme",
+  "dependencies": {
+    "@google-cloud/logging": "^10.4.0",
+    "pino-abstract-transport": "^1.0.0"
+  },
+  "devDependencies": {
+    "@google-cloud/trace-agent": "^7.1.2",
+    "@trivago/prettier-plugin-sort-imports": "^4.1.1",
+    "@tsconfig/node16-strictest": "^1.0.4",
+    "@types/jest": "^29.4.0",
+    "@typescript-eslint/eslint-plugin": "^5.54.0",
+    "@typescript-eslint/parser": "^5.54.0",
+    "eslint": "^8.35.0",
+    "eslint-plugin-eslint-plugin": "^5.0.8",
+    "prettier": "^2.8.4",
+    "rimraf": "^4.1.2",
+    "ts-jest": "^29.0.5",
+    "ts-node": "^10.9.1",
+    "tsc-alias": "^1.8.2",
+    "typescript": "^4.9.5"
+  }
+}
