@@ -2,8 +2,8 @@
 
 Pino transport for Google Logging
 
-![NPM](https://img.shields.io/npm/l/pino-google-logging)
-[![npm version](https://img.shields.io/npm/v/pino-google-logging)](https://www.npmjs.com/package/pino-google-logging)
+![NPM](https://img.shields.io/npm/l/pino-google-logging?style=flat-square)
+![npm](https://img.shields.io/npm/v/pino-google-logging?style=flat-square)
 
 This module provides a 'transport' for pino that sends logs to [Google Logging](https://cloud.google.com/logging).
 
