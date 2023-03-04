@@ -31,6 +31,7 @@
   "homepage": "https://github.com/trantamjp/pino-google-logging#readme",
   "dependencies": {
     "@google-cloud/logging": "^10.4.0",
+    "@sinclair/typebox": "^0.25.24",
     "pino-abstract-transport": "^1.0.0"
   },
   "devDependencies": {

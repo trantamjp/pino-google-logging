@@ -2,7 +2,9 @@ import pinoGoogleLoggingTransport from "../src";
 import { DEFAULT_SEVERITY_MAP, LoggingCommon } from "@/LoggingCommon";
 import { Log, Logging } from "@google-cloud/logging";
 
-const mockLog = jest.spyOn(Log.prototype, "write");
+const mockLog = jest
+  .spyOn(Log.prototype, "write")
+  .mockImplementation(jest.fn());
 
 const clientLogging = new Logging();
 const cloudLogInstance = new Log(clientLogging, "test_log", {
@@ -20,7 +22,7 @@ const cloudLogInstance = new Log(clientLogging, "test_log", {
 
 describe("Log", () => {
   beforeEach(() => {
-    mockLog.mockReset();
+    mockLog.mockClear();
   });
 
   afterAll(() => {

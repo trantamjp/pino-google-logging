@@ -1,4 +1,11 @@
-import type { DefaultMetadata, GoogleLoggingTransportOptions } from ".";
+import {
+  DefaultMetadata,
+  GoogleLoggingTransportOptions,
+  LOGGING_SAMPLED_KEY,
+  LOGGING_SPAN_KEY,
+  LOGGING_TRACE_KEY,
+  LogObject,
+} from "@/options";
 import {
   Entry,
   HttpRequest,
@@ -13,21 +20,6 @@ import type { LogOptions } from "@google-cloud/logging/build/src/log";
 import type { LogSyncOptions } from "@google-cloud/logging/build/src/log-sync";
 import type { SeverityNames } from "@google-cloud/logging/build/src/utils/log-common";
 import type { StackdriverTracer } from "@google-cloud/trace-agent/build/src/trace-api";
-
-/**
- * Log entry data key to allow users to indicate a trace for the request.
- */
-export const LOGGING_TRACE_KEY = "logging.googleapis.com/trace";
-
-/**
- * Log entry data key to allow users to indicate a spanId for the request.
- */
-export const LOGGING_SPAN_KEY = "logging.googleapis.com/spanId";
-
-/**
- * Log entry data key to allow users to indicate a traceSampled flag for the request.
- */
-export const LOGGING_SAMPLED_KEY = "logging.googleapis.com/trace_sampled";
 
 /**
  * Default severity mapping from pino levels
@@ -84,15 +76,8 @@ function getCurrentTraceFromAgent(): string | null {
   return `projects/${traceProjectId}/traces/${traceId}`;
 }
 
-export type LogObject = {
-  level?: string | number; // number preferred. metadata.severity is populated from this value
-  time?: string | number; // number preferred. Will be promoted to metadata.timestamp
-
-  [x: string]: unknown;
-};
-
 export class LoggingCommon {
-  readonly defaultMetadata: DefaultMetadata;
+  readonly defaultMetadata: Required<DefaultMetadata>;
 
   #clientLoggingOptions: LoggingOptions;
   #cloudLog?: Log | LogSync;
@@ -146,7 +131,7 @@ export class LoggingCommon {
       },
       options
     );
-    // this.logging = new Logging(loggingOptions);
+
     if (!this.#redirectToStdout) {
       this.#cloudLogOptions = Object.assign(
         DEFAULT_LOGGING_LOG_OPTIONS,
