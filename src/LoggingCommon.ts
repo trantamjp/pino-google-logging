@@ -145,13 +145,13 @@ export class LoggingCommon {
     }
   }
 
-  protected mapSeverity(logLevel: string | number): SeverityNames {
+  protected mapSeverity(logLevel?: string | number) {
     if (typeof logLevel == "number") {
       logLevel = ~~(logLevel / 10) * 10; // round down to tenth
       if (logLevel < 10) logLevel = 10;
       else if (logLevel > 60) logLevel = 60;
     }
-    const severity = this.#severityMap[logLevel] ?? "info";
+    const severity = (logLevel && this.#severityMap[logLevel]) || "default";
     return severity;
   }
 
@@ -204,7 +204,7 @@ export class LoggingCommon {
         this.defaultMetadata.resource,
         metadata.resource
       ),
-      severity: this.mapSeverity(obj["level"] ?? "info"),
+      severity: this.mapSeverity(obj["level"]).toUpperCase(),
     };
 
     // Attach serviceContext if there is an error from payload

@@ -92,7 +92,7 @@ describe("Log", () => {
               timestamp: expect.any(Date),
               labels: { logger: "pino", agent: "pino-google-logging" },
               resource: { type: "global" },
-              severity: DEFAULT_SEVERITY_MAP[log.level],
+              severity: DEFAULT_SEVERITY_MAP[log.level]?.toUpperCase(),
               trace: null,
               traceSampled: false,
               insertId: expect.stringMatching(/^[.\w]{32}$/),
