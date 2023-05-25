@@ -12,6 +12,8 @@ const cloudLogInstance = new Log(clientLogging, "test_log", {
   maxEntrySize: 250000,
 });
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 (
   jest.spyOn(
     LoggingCommon.prototype,
@@ -80,41 +82,39 @@ describe("Log", () => {
     ];
 
     const logSerialized = logs.map((log) => JSON.stringify(log)).join("\n");
-
     transport.write(logSerialized);
     transport.end();
 
-    await new Promise<void>((resolve) => {
-      transport.on("end", () => {
-        logs.forEach((log, idx) => {
-          const want = {
-            metadata: {
-              timestamp: expect.any(Date),
-              labels: { logger: "pino", agent: "pino-google-logging" },
-              resource: { type: "global" },
-              severity: DEFAULT_SEVERITY_MAP[log.level]?.toUpperCase(),
-              trace: null,
-              traceSampled: false,
-              insertId: expect.stringMatching(/^[.\w]{32}$/),
-            },
-            data: {
-              level: log.level,
-              pid: expect.any(Number),
-              hostname: expect.any(String),
-              message: log.msg,
-              ...(log.prop
-                ? {
-                    prop: log.prop,
-                  }
-                : undefined),
-            },
-          };
+    for (let index = 0; index < 60; index++) {
+      if (transport.destroyed) break;
+      await sleep(500);
+    }
+    logs.forEach((log, idx) => {
+      const want = {
+        metadata: {
+          timestamp: expect.any(Date),
+          labels: { logger: "pino", agent: "pino-google-logging" },
+          resource: { type: "global" },
+          severity: DEFAULT_SEVERITY_MAP[log.level]?.toUpperCase(),
+          trace: null,
+          traceSampled: false,
+          insertId: expect.stringMatching(/^[.\w]{32}$/),
+        },
+        data: {
+          level: log.level,
+          pid: expect.any(Number),
+          hostname: expect.any(String),
+          message: log.msg,
+          ...(log.prop
+            ? {
+                prop: log.prop,
+              }
+            : undefined),
+        },
+      };
 
-          const got = (mockLog.mock.calls[idx]?.[0] as Array<unknown>)[0];
-          expect(got).toEqual(expect.objectContaining(want));
-        });
-        resolve();
-      });
+      const got = (mockLog.mock.calls[idx]?.[0] as Array<unknown>)[0];
+      expect(got).toEqual(expect.objectContaining(want));
     });
   });
 });

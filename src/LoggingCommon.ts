@@ -20,6 +20,7 @@ import type { LogOptions } from "@google-cloud/logging/build/src/log";
 import type { LogSyncOptions } from "@google-cloud/logging/build/src/log-sync";
 import type { SeverityNames } from "@google-cloud/logging/build/src/utils/log-common";
 import type { StackdriverTracer } from "@google-cloud/trace-agent/build/src/trace-api";
+import Bottleneck from "bottleneck";
 
 /**
  * Default severity mapping from pino levels
@@ -38,6 +39,8 @@ export const DEFAULT_SEVERITY_MAP: Record<string | number, SeverityNames> = {
   60: "critical",
   fatal: "critical",
 };
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const DEFAULT_LOGGING_LOG_OPTIONS: LogOptions = {
   removeCircular: true,
@@ -90,6 +93,12 @@ export class LoggingCommon {
   #redirectToStdout: boolean;
   #serviceContext?: ServiceContext;
   #severityMap: Record<string | number, SeverityNames>;
+  #flushCheckIntervalMs: number;
+  #flushTimeoutMs: number;
+
+  bottleneck = new Bottleneck({
+    maxConcurrent: 1,
+  });
 
   // LOGGING_TRACE_KEY is Cloud Logging specific and has the format:
   // logging.googleapis.com/trace
@@ -143,6 +152,9 @@ export class LoggingCommon {
         options.cloudLogOptions
       );
     }
+
+    this.#flushCheckIntervalMs = options.flushCheckIntervalMs ?? 500; // 0.5s
+    this.#flushTimeoutMs = options.flushTimeoutMs ?? 30000; // 30s
   }
 
   protected mapSeverity(logLevel?: string | number) {
@@ -241,7 +253,13 @@ export class LoggingCommon {
     entries.push(this.entry(entryMetadata, obj));
 
     if (this.cloudLog instanceof Log) {
-      await this.cloudLog.write(entries);
+      this.bottleneck.schedule(
+        (log: Log, entries: Entry[]) => {
+          return log.write(entries);
+        },
+        this.cloudLog,
+        entries
+      );
     } else {
       this.cloudLog.write(entries);
     }
@@ -252,5 +270,21 @@ export class LoggingCommon {
       return (this.cloudLog as LogSync).entry(metadata, data);
     }
     return (this.cloudLog as Log).entry(metadata, data);
+  }
+
+  async flush() {
+    const start = Date.now();
+
+    while (Date.now() - start < this.#flushTimeoutMs) {
+      const cnt = this.bottleneck.counts();
+      if (
+        cnt.RECEIVED == 0 &&
+        cnt.QUEUED == 0 &&
+        cnt.RUNNING == 0 &&
+        cnt.EXECUTING == 0
+      )
+        break;
+      await sleep(this.#flushCheckIntervalMs);
+    }
   }
 }

@@ -8,10 +8,19 @@ export default async function (opts: GoogleLoggingTransportOptions) {
   const cloudLogging = new LoggingCommon(opts);
   await cloudLogging.init();
 
-  const buildFn = build(async function (source) {
-    for await (const obj of source) {
-      await cloudLogging.log(obj as LogObject);
+  const buildFn = build(
+    async function (source) {
+      for await (const obj of source) {
+        await cloudLogging.log(obj as LogObject);
+      }
+    },
+    {
+      close: (_err, cb) => {
+        cloudLogging.flush().then(() => {
+          cb;
+        });
+      },
     }
-  }, {});
+  );
   return buildFn;
 }

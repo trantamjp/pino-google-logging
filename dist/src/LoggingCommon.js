@@ -10,22 +10,15 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-var _LoggingCommon_clientLoggingOptions, _LoggingCommon_cloudLog, _LoggingCommon_cloudLogOptions, _LoggingCommon_errorKey, _LoggingCommon_httpRequestKey, _LoggingCommon_messageKey, _LoggingCommon_metadataKey, _LoggingCommon_redirectToStdout, _LoggingCommon_serviceContext, _LoggingCommon_severityMap;
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+var _LoggingCommon_clientLoggingOptions, _LoggingCommon_cloudLog, _LoggingCommon_cloudLogOptions, _LoggingCommon_errorKey, _LoggingCommon_httpRequestKey, _LoggingCommon_messageKey, _LoggingCommon_metadataKey, _LoggingCommon_redirectToStdout, _LoggingCommon_serviceContext, _LoggingCommon_severityMap, _LoggingCommon_flushCheckIntervalMs, _LoggingCommon_flushTimeoutMs;
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LoggingCommon = exports.DEFAULT_SEVERITY_MAP = exports.LOGGING_SAMPLED_KEY = exports.LOGGING_SPAN_KEY = exports.LOGGING_TRACE_KEY = void 0;
+exports.LoggingCommon = exports.DEFAULT_SEVERITY_MAP = void 0;
+const options_1 = require("./options");
 const logging_1 = require("@google-cloud/logging");
-/**
- * Log entry data key to allow users to indicate a trace for the request.
- */
-exports.LOGGING_TRACE_KEY = "logging.googleapis.com/trace";
-/**
- * Log entry data key to allow users to indicate a spanId for the request.
- */
-exports.LOGGING_SPAN_KEY = "logging.googleapis.com/spanId";
-/**
- * Log entry data key to allow users to indicate a traceSampled flag for the request.
- */
-exports.LOGGING_SAMPLED_KEY = "logging.googleapis.com/trace_sampled";
+const bottleneck_1 = __importDefault(require("bottleneck"));
 /**
  * Default severity mapping from pino levels
  */
@@ -43,6 +36,7 @@ exports.DEFAULT_SEVERITY_MAP = {
     60: "critical",
     fatal: "critical",
 };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const DEFAULT_LOGGING_LOG_OPTIONS = {
     removeCircular: true,
     // See: https://cloud.google.com/logging/quotas, a log size of
@@ -86,6 +80,11 @@ class LoggingCommon {
         _LoggingCommon_redirectToStdout.set(this, void 0);
         _LoggingCommon_serviceContext.set(this, void 0);
         _LoggingCommon_severityMap.set(this, void 0);
+        _LoggingCommon_flushCheckIntervalMs.set(this, void 0);
+        _LoggingCommon_flushTimeoutMs.set(this, void 0);
+        this.bottleneck = new bottleneck_1.default({
+            maxConcurrent: 1,
+        });
         this.defaultMetadata = {
             logName: options.logName ?? "pino_log",
             resource: Object.assign({ type: "global" }, options.resource),
@@ -101,13 +100,14 @@ class LoggingCommon {
         __classPrivateFieldSet(this, _LoggingCommon_clientLoggingOptions, Object.assign({}, {
             scopes: ["https://www.googleapis.com/auth/logging.write"],
         }, options), "f");
-        // this.logging = new Logging(loggingOptions);
         if (!__classPrivateFieldGet(this, _LoggingCommon_redirectToStdout, "f")) {
             __classPrivateFieldSet(this, _LoggingCommon_cloudLogOptions, Object.assign(DEFAULT_LOGGING_LOG_OPTIONS, options.cloudLogOptions), "f");
         }
         else {
             __classPrivateFieldSet(this, _LoggingCommon_cloudLogOptions, Object.assign(DEFAULT_LOGGING_LOGSYNC_OPTIONS, options.cloudLogOptions), "f");
         }
+        __classPrivateFieldSet(this, _LoggingCommon_flushCheckIntervalMs, options.flushCheckIntervalMs ?? 500, "f"); // 0.5s
+        __classPrivateFieldSet(this, _LoggingCommon_flushTimeoutMs, options.flushTimeoutMs ?? 30000, "f"); // 30s
     }
     mapSeverity(logLevel) {
         if (typeof logLevel == "number") {
@@ -117,7 +117,7 @@ class LoggingCommon {
             else if (logLevel > 60)
                 logLevel = 60;
         }
-        const severity = __classPrivateFieldGet(this, _LoggingCommon_severityMap, "f")[logLevel] ?? "info";
+        const severity = (logLevel && __classPrivateFieldGet(this, _LoggingCommon_severityMap, "f")[logLevel]) || "default";
         return severity;
     }
     async init() {
@@ -152,7 +152,7 @@ class LoggingCommon {
             ...metadata,
             labels: Object.assign({}, this.defaultMetadata.labels, metadata.labels),
             resource: Object.assign({}, this.defaultMetadata.resource, metadata.resource),
-            severity: this.mapSeverity(obj["level"] ?? "info"),
+            severity: this.mapSeverity(obj["level"]).toUpperCase(),
         };
         // Attach serviceContext if there is an error from payload
         if (obj[__classPrivateFieldGet(this, _LoggingCommon_errorKey, "f")] && __classPrivateFieldGet(this, _LoggingCommon_serviceContext, "f"))
@@ -181,7 +181,9 @@ class LoggingCommon {
         const entries = [];
         entries.push(this.entry(entryMetadata, obj));
         if (this.cloudLog instanceof logging_1.Log) {
-            await this.cloudLog.write(entries);
+            this.bottleneck.schedule((log, entries) => {
+                return log.write(entries);
+            }, this.cloudLog, entries);
         }
         else {
             this.cloudLog.write(entries);
@@ -193,16 +195,28 @@ class LoggingCommon {
         }
         return this.cloudLog.entry(metadata, data);
     }
+    async flush() {
+        const start = Date.now();
+        while (Date.now() - start < __classPrivateFieldGet(this, _LoggingCommon_flushTimeoutMs, "f")) {
+            const cnt = this.bottleneck.counts();
+            if (cnt.RECEIVED == 0 &&
+                cnt.QUEUED == 0 &&
+                cnt.RUNNING == 0 &&
+                cnt.EXECUTING == 0)
+                break;
+            await sleep(__classPrivateFieldGet(this, _LoggingCommon_flushCheckIntervalMs, "f"));
+        }
+    }
 }
 exports.LoggingCommon = LoggingCommon;
-_LoggingCommon_clientLoggingOptions = new WeakMap(), _LoggingCommon_cloudLog = new WeakMap(), _LoggingCommon_cloudLogOptions = new WeakMap(), _LoggingCommon_errorKey = new WeakMap(), _LoggingCommon_httpRequestKey = new WeakMap(), _LoggingCommon_messageKey = new WeakMap(), _LoggingCommon_metadataKey = new WeakMap(), _LoggingCommon_redirectToStdout = new WeakMap(), _LoggingCommon_serviceContext = new WeakMap(), _LoggingCommon_severityMap = new WeakMap();
+_LoggingCommon_clientLoggingOptions = new WeakMap(), _LoggingCommon_cloudLog = new WeakMap(), _LoggingCommon_cloudLogOptions = new WeakMap(), _LoggingCommon_errorKey = new WeakMap(), _LoggingCommon_httpRequestKey = new WeakMap(), _LoggingCommon_messageKey = new WeakMap(), _LoggingCommon_metadataKey = new WeakMap(), _LoggingCommon_redirectToStdout = new WeakMap(), _LoggingCommon_serviceContext = new WeakMap(), _LoggingCommon_severityMap = new WeakMap(), _LoggingCommon_flushCheckIntervalMs = new WeakMap(), _LoggingCommon_flushTimeoutMs = new WeakMap();
 // LOGGING_TRACE_KEY is Cloud Logging specific and has the format:
 // logging.googleapis.com/trace
-LoggingCommon.LOGGING_TRACE_KEY = exports.LOGGING_TRACE_KEY;
+LoggingCommon.LOGGING_TRACE_KEY = options_1.LOGGING_TRACE_KEY;
 // LOGGING_TRACE_KEY is Cloud Logging specific and has the format:
 // logging.googleapis.com/spanId
-LoggingCommon.LOGGING_SPAN_KEY = exports.LOGGING_SPAN_KEY;
+LoggingCommon.LOGGING_SPAN_KEY = options_1.LOGGING_SPAN_KEY;
 // LOGGING_SAMPLED_KEY is Cloud Logging specific and has the format:
 // logging.googleapis.com/trace_sampled
-LoggingCommon.LOGGING_SAMPLED_KEY = exports.LOGGING_SAMPLED_KEY;
+LoggingCommon.LOGGING_SAMPLED_KEY = options_1.LOGGING_SAMPLED_KEY;
 //# sourceMappingURL=LoggingCommon.js.map

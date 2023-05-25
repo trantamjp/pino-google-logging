@@ -1,6 +1,6 @@
 {
   "name": "pino-google-logging",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Pino transport for Google Logging",
   "main": "dist/src/index.js",
   "scripts": {
@@ -31,7 +31,8 @@
   "homepage": "https://github.com/trantamjp/pino-google-logging#readme",
   "dependencies": {
     "@google-cloud/logging": "^10.4.0",
-    "@sinclair/typebox": "^0.25.24",
+    "@sinclair/typebox": "^0.28.12",
+    "bottleneck": "^2.19.5",
     "pino-abstract-transport": "^1.0.0"
   },
   "devDependencies": {
@@ -44,7 +45,7 @@
     "eslint": "^8.35.0",
     "eslint-plugin-eslint-plugin": "^5.0.8",
     "prettier": "^2.8.4",
-    "rimraf": "^4.1.2",
+    "rimraf": "^5.0.1",
     "ts-jest": "^29.0.5",
     "ts-node": "^10.9.1",
     "tsc-alias": "^1.8.2",

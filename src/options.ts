@@ -51,6 +51,14 @@ const PinoOptions = Type.Object({
 });
 
 /**
+ * Options for flushing log.
+ */
+const FlushLogsOptions = Type.Object({
+  flushCheckIntervalMs: Type.Optional(Type.Number()),
+  flushTimeoutMs: Type.Optional(Type.Number()),
+});
+
+/**
  * Default metadata to be used for logging. See LogEntry.
  * Each logged object can have its own metadata and will be merged with default metadata.
  * See {@link https://github.com/googleapis/nodejs-logging/blob/main/src/utils/log-common.ts#L31}
@@ -151,6 +159,7 @@ const LogSyncOptions = Type.Object({
 
 export const GoogleLoggingTransportOptions = Type.Intersect([
   PinoOptions,
+  FlushLogsOptions,
   DefaultMetadata,
   Type.Object({
     /**
